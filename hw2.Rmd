@@ -1,0 +1,50 @@
+---
+title: "Storyboard"
+output: 
+  flexdashboard::flex_dashboard:
+    storyboard: true
+---
+
+### An Introduction to Fiona Apple
+
+```{r}
+```
+
+------------------------------------------------------------------------
+
+As for my corpus that I will use to build my portfolio, I will be using the discography of Fiona Apple (1977) as my database. Fiona, still a teenager, came onto the alternative jazz and pop scene in the late 90s with aggressive piano ballads, emotional vocal deliveries and amazing songwriting skills. Even though I will not be analyzing the latter as much, it is still nice to mention.
+
+I will be analyzing her sound as it progresses over the years. Fiona Apple has released 5 full studio albums between the years of 1996 and 2020: Tidal (1996), When The Pawn.. (1999), Extraordinary Machine (2005), The Idler Wheel.. (2012) and Fetch The Bolt Cutters (2020). A ton has changed in the musical landscape in these 24 years, but Fiona has managed to find her place in it. She has adapted her sound in a lot of ways, never losing what makes a Fiona Apple song a Fiona Apple song.
+
+I will only be using the songs of the albums and not any of the singles. This is quite representative of her full discography as she doesn’t have many singles that aren’t a part of the full album discography. It is the progression of every single full project that i want to measure.
+
+Some tracks, typical & atypical I would like to analyze:
+
+Heavy Balloon - Fetch The Bolt Cutters - This is very different from the regular Fiona Apple formula and sounds more like something Lorde would’ve made in 2016.
+
+Fast As You Can - When The Pawn… - To me personally, the quintessential Fiona Apple song. It is what I would constitute the formula.
+
+------------------------------------------------------------------------
+
+### Radical Sensitivity: Visualized
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+library(spotifyr)
+library(tidyverse)
+library(ggplot2)
+corpus <- get_playlist_audio_features("", "7LDyKnV7gitLREBYl6kVLz")
+
+
+p <- ggplot(corpus, aes(x = energy, y = valence, size = track.popularity, color = mode)) + geom_point()
+p + facet_wrap(~track.album.name)
+```
+
+### Conclusions
+
+```{r}
+```
+
+------------------------------------------------------------------------
+
+I have to analyze the corpus further to make any conclusions. My idea for the structure of the portfolio is going to be inspired by an profile by the New Yorker on Fiona Apple called: Fiona Apple’s Art of Radical Sensitivity. I will also be expanding the corpus further by including music of her peers at the time.
