@@ -5,6 +5,76 @@ output:
     storyboard: true
 ---
 
+### Classification & Clustering
+
+``` {r}
+library(spotifyr)
+library(tidyverse)
+library(tidymodels)
+library(ggplot2)
+library(gganimate)
+library(compmus)
+library(ggdendro)
+library(heatmaply)
+
+tidal <-
+  get_playlist_audio_features("tidal", "6AWmwswoM3JHtgSFC6FNfU") |>
+  add_audio_analysis() |>
+  mutate(
+    segments = map2(segments, key, compmus_c_transpose),
+    pitches =
+      map(segments,
+        compmus_summarise, pitches,
+        method = "mean", norm = "manhattan"
+      ),
+    timbre =
+      map(
+        segments,
+        compmus_summarise, timbre,
+        method = "mean"
+      )
+  ) |>
+  mutate(pitches = map(pitches, compmus_normalise, "clr")) |>
+  mutate_at(vars(pitches, timbre), map, bind_rows) |>
+  unnest(cols = c(pitches, timbre))
+
+tidal_juice <-
+  recipe(
+    track.name ~
+      danceability +
+      energy +
+      loudness +
+      speechiness +
+      acousticness +
+      instrumentalness +
+      liveness +
+      valence +
+      tempo,
+    data = tidal
+  ) |>
+  step_center(all_predictors()) |>
+  step_scale(all_predictors()) |> 
+  # step_range(all_predictors()) |> 
+  prep(tidal |> mutate(track.name = str_trunc(track.name, 20))) |>
+  juice() |>
+  column_to_rownames("track.name")
+
+tidal_dist <- dist(tidal_juice, method = "euclidean")
+
+heatmaply(
+  tidal_juice,
+  hclustfun = hclust,
+  hclust_method = "single",  # Change for single, average, or complete linkage.
+  dist_method = "euclidean"
+)
+
+```
+```
+-------------------------------------------------------------------------------
+
+I think it's interesting to see which track features are strongly correlated with eachother in Fiona Apple's debut.
+
+
 ### Chordogram
 
 ```{r}
