@@ -3,14 +3,11 @@ title: "Radical Sensitivity: Visualized"
 output: 
   flexdashboard::flex_dashboard:
     storyboard: true
-runtime: shiny
 ---
 
 ### An Introduction to Fiona Apple
 
 ```{r}
-library(shiny)
-library(shinyjs)
 library(spotifyr)
 library(tidyverse)
 library(ggplot2)
@@ -19,92 +16,46 @@ library(plotly)
 # Fetch the data from the Spotify API
 corpus <- get_playlist_audio_features("", "7LDyKnV7gitLREBYl6kVLz")
 
+# Define the replacement album name
+replacement_name <- "The Idler Wheel..."
+
+# Replace the long album name with the shorter one in the corpus dataset
+corpus <- corpus %>%
+  mutate(track.album.name = ifelse(track.album.name == "The Idler Wheel Is Wiser Than the Driver of the Screw and Whipping Cords Will Serve You More Than Ropes Will Ever Do (Expanded Edition)", 
+                                   "The Idler Wheel...", 
+                                   track.album.name))
+
 # Specify the order of albums
 album_order <- c("Tidal", "When The Pawn...", "Extraordinary Machine", 
-                 "The Idler Wheel Is Wiser Than the Driver of the Screw and Whipping Cords Will Serve You More Than Ropes Will Ever Do (Expanded Edition)", 
+                 "The Idler Wheel...", 
                  "Fetch The Bolt Cutters")
 
-# Define color palette
+# Define color palette with shortened album names
 album_colors <- c("Tidal" = "blue", 
                   "When The Pawn..." = "red", 
                   "Extraordinary Machine" = "green", 
-                  "The Idler Wheel Is Wiser Than the Driver of the Screw and Whipping Cords Will Serve You More Than Ropes Will Ever Do (Expanded Edition)" = "brown", 
+                  "The Idler Wheel..." = "brown", 
                   "Fetch The Bolt Cutters" = "purple")
 
-# Function to create a plot for each album
-plot_album <- function(album_name) {
-  # Filter data for the specified album
-  album_data <- corpus %>% filter(track.album.name == album_name)
-  
-  # Create the plot
-  p <- ggplot(album_data, aes(x = acousticness, y = valence, size = energy, 
-                              text = paste("Song:", track.name, "<br>Album:", track.album.name, "<br>Energy:", energy))) +  # Define tooltip text
-    geom_point(aes(color = album_name)) +  # Set color to album
-    scale_color_manual(values = album_colors, guide = FALSE) +  # Remove legend for album name
-    scale_size_continuous(range = c(3, 10), guide = FALSE) +  # Set point size without legend
-    theme_minimal() +
-    labs(title = ifelse(album_name == "The Idler Wheel Is Wiser Than the Driver of the Screw and Whipping Cords Will Serve You More Than Ropes Will Ever Do (Expanded Edition)", 
-                        "The Idler Wheel...", album_name)) +  # Set plot title
-    scale_x_continuous(limits = c(0, 1)) +  # Set x-axis limits
-    scale_y_continuous(limits = c(0, 1))  # Set y-axis limits
-    
-  # Convert ggplot object to plotly
-  p <- ggplotly(p, tooltip = "text")
-  p <- p %>% layout(showlegend = FALSE)
-  
-  # Return the plot
-  return(p)
-}
+# Combine data for all albums
+combined_data <- map_dfr(album_order, ~filter(corpus, track.album.name == .x) %>% mutate(album_name = .x))
 
-
-# Define UI
-ui <- fluidPage(
-  titlePanel("Fiona Apple's Discography Analysis"),
-  fluidRow(
-    column(12, plotlyOutput("albumPlot", height = 500, width = 500))
-  ),
-  fluidRow(
-    column(6, align = "right", actionButton("prevButton", "Previous")),
-    column(6, align = "left", actionButton("nextButton", "Next"))
-  )
-)
-
-# Define server logic
-server <- function(input, output, session) {
-  # Initialize index for album order
-  album_index <- reactiveVal(1)
-  
-  # Update album index when previous button is clicked
-  observeEvent(input$prevButton, {
-    album_index(album_index() - 1)
-    if (album_index() < 1) {
-      album_index(length(album_order))
-    }
-  })
-  
-  # Update album index when next button is clicked
-  observeEvent(input$nextButton, {
-    album_index(album_index() + 1)
-    if (album_index() > length(album_order)) {
-      album_index(1)
-    }
-  })
-  
-  # Render plot for current album
-  output$albumPlot <- renderPlotly({
-    # Get current album name
-    current_album <- album_order[album_index()]
-    
-    # Generate and display plot for current album
-    plot_album(current_album)
-  })
-}
-
-# Run the application
-shinyApp(ui = ui, server = server)
+plot_ly(combined_data, x = ~acousticness, y = ~valence, color = ~album_name,
+        colors = album_colors, size = ~energy, text = ~paste("Track:", track.name, "<br>Energy:", energy)) %>%
+  add_markers() %>%
+  layout(title = "Fiona Apple's Discography Analysis",
+         xaxis = list(title = "Acousticness", range = c(0, 1)),
+         yaxis = list(title = "Valence", range = c(0, 1)),
+         legend = list(orientation = "h", x = 0.5, y = -0.2, tracegroupgap = 200),
+         aspectratio = list(x = 1, y = 1),
+         legend_title = "Albums",
+         legend_itemclick = FALSE, 
+         legend_itemdoubleclick = FALSE,
+         showlegend = TRUE,
+         marker = list(size = 8)) 
 ```
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------
 
 For this computational musicological analysis, I have chosen to focus on the discography of Fiona Apple (born 1977). Fiona burst onto the alternative jazz and pop scene in the late 90s as a teenager, captivating audiences with her aggressive piano ballads, emotionally charged vocal deliveries, and exceptional songwriting skills. Although I will not delve extensively into her songwriting prowess, it is worth acknowledging its significance in her musical identity.
 
@@ -117,8 +68,6 @@ By examining these tracks and others across her discography, I aim to provide a 
 ### Radical Sensitivity: Visualized
 
 ```{r}
-library(shiny)
-library(shinyjs)
 library(spotifyr)
 library(tidyverse)
 library(ggplot2)
@@ -127,89 +76,43 @@ library(plotly)
 # Fetch the data from the Spotify API
 corpus <- get_playlist_audio_features("", "7LDyKnV7gitLREBYl6kVLz")
 
+# Define the replacement album name
+replacement_name <- "The Idler Wheel..."
+
+# Replace the long album name with the shorter one in the corpus dataset
+corpus <- corpus %>%
+  mutate(track.album.name = ifelse(track.album.name == "The Idler Wheel Is Wiser Than the Driver of the Screw and Whipping Cords Will Serve You More Than Ropes Will Ever Do (Expanded Edition)", 
+                                   "The Idler Wheel...", 
+                                   track.album.name))
+
 # Specify the order of albums
 album_order <- c("Tidal", "When The Pawn...", "Extraordinary Machine", 
-                 "The Idler Wheel Is Wiser Than the Driver of the Screw and Whipping Cords Will Serve You More Than Ropes Will Ever Do (Expanded Edition)", 
+                 "The Idler Wheel...", 
                  "Fetch The Bolt Cutters")
 
-# Define color palette
+# Define color palette with shortened album names
 album_colors <- c("Tidal" = "blue", 
                   "When The Pawn..." = "red", 
                   "Extraordinary Machine" = "green", 
-                  "The Idler Wheel Is Wiser Than the Driver of the Screw and Whipping Cords Will Serve You More Than Ropes Will Ever Do (Expanded Edition)" = "brown", 
+                  "The Idler Wheel..." = "brown", 
                   "Fetch The Bolt Cutters" = "purple")
 
-# Function to create a plot for each album
-plot_album <- function(album_name) {
-  # Filter data for the specified album
-  album_data <- corpus %>% filter(track.album.name == album_name)
-  
-  # Create the plot
-  p <- ggplot(album_data, aes(x = acousticness, y = valence, size = energy, 
-                              text = paste("Song:", track.name, "<br>Album:", track.album.name, "<br>Energy:", energy))) +  # Define tooltip text
-    geom_point(aes(color = album_name)) +  # Set color to album
-    scale_color_manual(values = album_colors, guide = FALSE) +  # Remove legend for album name
-    scale_size_continuous(range = c(3, 10), guide = FALSE) +  # Set point size without legend
-    theme_minimal() +
-    labs(title = ifelse(album_name == "The Idler Wheel Is Wiser Than the Driver of the Screw and Whipping Cords Will Serve You More Than Ropes Will Ever Do (Expanded Edition)", 
-                        "The Idler Wheel...", album_name)) +  # Set plot title
-    scale_x_continuous(limits = c(0, 1)) +  # Set x-axis limits
-    scale_y_continuous(limits = c(0, 1))  # Set y-axis limits
-    
-  # Convert ggplot object to plotly
-  p <- ggplotly(p, tooltip = "text")
-  p <- p %>% layout(showlegend = FALSE)
-  
-  # Return the plot
-  return(p)
-}
+# Combine data for all albums
+combined_data <- map_dfr(album_order, ~filter(corpus, track.album.name == .x) %>% mutate(album_name = .x))
 
-
-# Define UI
-ui <- fluidPage(
-  titlePanel("Fiona Apple's Discography Analysis"),
-  fluidRow(
-    column(12, plotlyOutput("albumPlot", height = 500, width = 500))
-  ),
-  fluidRow(
-    column(6, align = "right", actionButton("prevButton", "Previous")),
-    column(6, align = "left", actionButton("nextButton", "Next"))
-  )
-)
-
-# Define server logic
-server <- function(input, output, session) {
-  # Initialize index for album order
-  album_index <- reactiveVal(1)
-  
-  # Update album index when previous button is clicked
-  observeEvent(input$prevButton, {
-    album_index(album_index() - 1)
-    if (album_index() < 1) {
-      album_index(length(album_order))
-    }
-  })
-  
-  # Update album index when next button is clicked
-  observeEvent(input$nextButton, {
-    album_index(album_index() + 1)
-    if (album_index() > length(album_order)) {
-      album_index(1)
-    }
-  })
-  
-  # Render plot for current album
-  output$albumPlot <- renderPlotly({
-    # Get current album name
-    current_album <- album_order[album_index()]
-    
-    # Generate and display plot for current album
-    plot_album(current_album)
-  })
-}
-
-# Run the application
-shinyApp(ui = ui, server = server)
+plot_ly(combined_data, x = ~acousticness, y = ~valence, color = ~album_name,
+        colors = album_colors, size = ~energy, text = ~paste("Track:", track.name, "<br>Energy:", energy)) %>%
+  add_markers() %>%
+  layout(title = "Fiona Apple's Discography Analysis",
+         xaxis = list(title = "Acousticness", range = c(0, 1)),
+         yaxis = list(title = "Valence", range = c(0, 1)),
+         legend = list(orientation = "h", x = 0.5, y = -0.2, tracegroupgap = 200),
+         aspectratio = list(x = 1, y = 1),
+         legend_title = "Albums",
+         legend_itemclick = FALSE, 
+         legend_itemdoubleclick = FALSE,
+         showlegend = TRUE,
+         marker = list(size = 8)) 
 ```
 
 ------------------------------------------------------------------------
@@ -588,8 +491,6 @@ Efforts to use classification algorithms to tell apart successful and unsuccessf
 ### Tempo Analysis
 
 ```{r}
-library(shiny)
-library(shinyjs)
 library(spotifyr)
 library(tidyverse)
 library(ggplot2)

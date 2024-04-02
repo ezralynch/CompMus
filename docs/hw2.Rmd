@@ -4,6 +4,39 @@ output:
   flexdashboard::flex_dashboard:
     storyboard: true
 ---
+### Classifcation and Clustering
+
+```{r}
+library(shiny)
+library(shinyjs)
+library(spotifyr)
+library(tidyverse)
+library(ggplot2)
+library(gganimate)
+library(compmus)
+
+discography <-
+  get_playlist_audio_features("bnfcollection", "1vsoLSK3ArkpaIHmUaF02C") |>
+  add_audio_analysis() |>
+  mutate(
+    segments = map2(segments, key, compmus_c_transpose),
+    pitches =
+      map(segments,
+        compmus_summarise, pitches,
+        method = "mean", norm = "manhattan"
+      ),
+    timbre =
+      map(
+        segments,
+        compmus_summarise, timbre,
+        method = "mean"
+      )
+  ) |>
+  mutate(pitches = map(pitches, compmus_normalise, "clr")) |>
+  mutate_at(vars(pitches, timbre), map, bind_rows) |>
+  unnest(cols = c(pitches, timbre))
+
+```
 
 ### Self Similarity and Spectogram
 
