@@ -1,79 +1,232 @@
 ---
-title: "Storyboard"
+title: "Radical Sensitivity: Visualized"
 output: 
   flexdashboard::flex_dashboard:
     storyboard: true
+runtime: shiny
 ---
 
-### Classification & Clustering
+### An Introduction to Fiona Apple
 
-``` {r}
+```{r}
+library(shiny)
+library(shinyjs)
 library(spotifyr)
 library(tidyverse)
-library(tidymodels)
 library(ggplot2)
-library(gganimate)
-library(compmus)
-library(ggdendro)
-library(heatmaply)
+library(plotly)
 
-tidal <-
-  get_playlist_audio_features("tidal", "6AWmwswoM3JHtgSFC6FNfU") |>
-  add_audio_analysis() |>
-  mutate(
-    segments = map2(segments, key, compmus_c_transpose),
-    pitches =
-      map(segments,
-        compmus_summarise, pitches,
-        method = "mean", norm = "manhattan"
-      ),
-    timbre =
-      map(
-        segments,
-        compmus_summarise, timbre,
-        method = "mean"
-      )
-  ) |>
-  mutate(pitches = map(pitches, compmus_normalise, "clr")) |>
-  mutate_at(vars(pitches, timbre), map, bind_rows) |>
-  unnest(cols = c(pitches, timbre))
+# Fetch the data from the Spotify API
+corpus <- get_playlist_audio_features("", "7LDyKnV7gitLREBYl6kVLz")
 
-tidal_juice <-
-  recipe(
-    track.name ~
-      danceability +
-      energy +
-      loudness +
-      speechiness +
-      acousticness +
-      instrumentalness +
-      liveness +
-      valence +
-      tempo,
-    data = tidal
-  ) |>
-  step_center(all_predictors()) |>
-  step_scale(all_predictors()) |> 
-  # step_range(all_predictors()) |> 
-  prep(tidal |> mutate(track.name = str_trunc(track.name, 20))) |>
-  juice() |>
-  column_to_rownames("track.name")
+# Specify the order of albums
+album_order <- c("Tidal", "When The Pawn...", "Extraordinary Machine", 
+                 "The Idler Wheel Is Wiser Than the Driver of the Screw and Whipping Cords Will Serve You More Than Ropes Will Ever Do (Expanded Edition)", 
+                 "Fetch The Bolt Cutters")
 
-tidal_dist <- dist(tidal_juice, method = "euclidean")
+# Define color palette
+album_colors <- c("Tidal" = "blue", 
+                  "When The Pawn..." = "red", 
+                  "Extraordinary Machine" = "green", 
+                  "The Idler Wheel Is Wiser Than the Driver of the Screw and Whipping Cords Will Serve You More Than Ropes Will Ever Do (Expanded Edition)" = "brown", 
+                  "Fetch The Bolt Cutters" = "purple")
 
-heatmaply(
-  tidal_juice,
-  hclustfun = hclust,
-  hclust_method = "single",  # Change for single, average, or complete linkage.
-  dist_method = "euclidean"
+# Function to create a plot for each album
+plot_album <- function(album_name) {
+  # Filter data for the specified album
+  album_data <- corpus %>% filter(track.album.name == album_name)
+  
+  # Create the plot
+  p <- ggplot(album_data, aes(x = acousticness, y = valence, size = energy, 
+                              text = paste("Song:", track.name, "<br>Album:", track.album.name, "<br>Energy:", energy))) +  # Define tooltip text
+    geom_point(aes(color = album_name)) +  # Set color to album
+    scale_color_manual(values = album_colors, guide = FALSE) +  # Remove legend for album name
+    scale_size_continuous(range = c(3, 10), guide = FALSE) +  # Set point size without legend
+    theme_minimal() +
+    labs(title = ifelse(album_name == "The Idler Wheel Is Wiser Than the Driver of the Screw and Whipping Cords Will Serve You More Than Ropes Will Ever Do (Expanded Edition)", 
+                        "The Idler Wheel...", album_name)) +  # Set plot title
+    scale_x_continuous(limits = c(0, 1)) +  # Set x-axis limits
+    scale_y_continuous(limits = c(0, 1))  # Set y-axis limits
+    
+  # Convert ggplot object to plotly
+  p <- ggplotly(p, tooltip = "text")
+  p <- p %>% layout(showlegend = FALSE)
+  
+  # Return the plot
+  return(p)
+}
+
+
+# Define UI
+ui <- fluidPage(
+  titlePanel("Fiona Apple's Discography Analysis"),
+  fluidRow(
+    column(12, plotlyOutput("albumPlot", height = 500, width = 500))
+  ),
+  fluidRow(
+    column(6, align = "right", actionButton("prevButton", "Previous")),
+    column(6, align = "left", actionButton("nextButton", "Next"))
+  )
 )
 
-```
-```
--------------------------------------------------------------------------------
+# Define server logic
+server <- function(input, output, session) {
+  # Initialize index for album order
+  album_index <- reactiveVal(1)
+  
+  # Update album index when previous button is clicked
+  observeEvent(input$prevButton, {
+    album_index(album_index() - 1)
+    if (album_index() < 1) {
+      album_index(length(album_order))
+    }
+  })
+  
+  # Update album index when next button is clicked
+  observeEvent(input$nextButton, {
+    album_index(album_index() + 1)
+    if (album_index() > length(album_order)) {
+      album_index(1)
+    }
+  })
+  
+  # Render plot for current album
+  output$albumPlot <- renderPlotly({
+    # Get current album name
+    current_album <- album_order[album_index()]
+    
+    # Generate and display plot for current album
+    plot_album(current_album)
+  })
+}
 
-I think it's interesting to see which track features are strongly correlated with eachother in Fiona Apple's debut.
+# Run the application
+shinyApp(ui = ui, server = server)
+```
 
+-----------------------------------------------------------------------------
+
+For this computational musicological analysis, I have chosen to focus on the discography of Fiona Apple (born 1977). Fiona burst onto the alternative jazz and pop scene in the late 90s as a teenager, captivating audiences with her aggressive piano ballads, emotionally charged vocal deliveries, and exceptional songwriting skills. Although I will not delve extensively into her songwriting prowess, it is worth acknowledging its significance in her musical identity.
+
+I will be examining the evolution of Fiona Apple's sound over the years, spanning five full studio albums released between 1996 and 2020: "Tidal" (1996), "When The Pawn..." (1999), "Extraordinary Machine" (2005), "The Idler Wheel..." (2012), and "Fetch The Bolt Cutters" (2020). Despite the significant shifts in the musical landscape over this 24-year period, Fiona has consistently found her place within it, adapting her sound while retaining the essence of what makes a Fiona Apple song distinct.
+
+For this analysis, I will focus solely on the songs from her albums, excluding any singles. This decision is reflective of Fiona Apple's discography, as she has released few standalone singles apart from her full album projects. I am interested in measuring the progression of each full project, as it encapsulates the evolution of Fiona's artistic vision and musical expression.
+
+By examining these tracks and others across her discography, I aim to provide a comprehensive understanding of Fiona Apple's musical evolution and the broader context of her contributions to the alternative music scene.
+
+### Radical Sensitivity: Visualized
+
+```{r}
+library(shiny)
+library(shinyjs)
+library(spotifyr)
+library(tidyverse)
+library(ggplot2)
+library(plotly)
+
+# Fetch the data from the Spotify API
+corpus <- get_playlist_audio_features("", "7LDyKnV7gitLREBYl6kVLz")
+
+# Specify the order of albums
+album_order <- c("Tidal", "When The Pawn...", "Extraordinary Machine", 
+                 "The Idler Wheel Is Wiser Than the Driver of the Screw and Whipping Cords Will Serve You More Than Ropes Will Ever Do (Expanded Edition)", 
+                 "Fetch The Bolt Cutters")
+
+# Define color palette
+album_colors <- c("Tidal" = "blue", 
+                  "When The Pawn..." = "red", 
+                  "Extraordinary Machine" = "green", 
+                  "The Idler Wheel Is Wiser Than the Driver of the Screw and Whipping Cords Will Serve You More Than Ropes Will Ever Do (Expanded Edition)" = "brown", 
+                  "Fetch The Bolt Cutters" = "purple")
+
+# Function to create a plot for each album
+plot_album <- function(album_name) {
+  # Filter data for the specified album
+  album_data <- corpus %>% filter(track.album.name == album_name)
+  
+  # Create the plot
+  p <- ggplot(album_data, aes(x = acousticness, y = valence, size = energy, 
+                              text = paste("Song:", track.name, "<br>Album:", track.album.name, "<br>Energy:", energy))) +  # Define tooltip text
+    geom_point(aes(color = album_name)) +  # Set color to album
+    scale_color_manual(values = album_colors, guide = FALSE) +  # Remove legend for album name
+    scale_size_continuous(range = c(3, 10), guide = FALSE) +  # Set point size without legend
+    theme_minimal() +
+    labs(title = ifelse(album_name == "The Idler Wheel Is Wiser Than the Driver of the Screw and Whipping Cords Will Serve You More Than Ropes Will Ever Do (Expanded Edition)", 
+                        "The Idler Wheel...", album_name)) +  # Set plot title
+    scale_x_continuous(limits = c(0, 1)) +  # Set x-axis limits
+    scale_y_continuous(limits = c(0, 1))  # Set y-axis limits
+    
+  # Convert ggplot object to plotly
+  p <- ggplotly(p, tooltip = "text")
+  p <- p %>% layout(showlegend = FALSE)
+  
+  # Return the plot
+  return(p)
+}
+
+
+# Define UI
+ui <- fluidPage(
+  titlePanel("Fiona Apple's Discography Analysis"),
+  fluidRow(
+    column(12, plotlyOutput("albumPlot", height = 500, width = 500))
+  ),
+  fluidRow(
+    column(6, align = "right", actionButton("prevButton", "Previous")),
+    column(6, align = "left", actionButton("nextButton", "Next"))
+  )
+)
+
+# Define server logic
+server <- function(input, output, session) {
+  # Initialize index for album order
+  album_index <- reactiveVal(1)
+  
+  # Update album index when previous button is clicked
+  observeEvent(input$prevButton, {
+    album_index(album_index() - 1)
+    if (album_index() < 1) {
+      album_index(length(album_order))
+    }
+  })
+  
+  # Update album index when next button is clicked
+  observeEvent(input$nextButton, {
+    album_index(album_index() + 1)
+    if (album_index() > length(album_order)) {
+      album_index(1)
+    }
+  })
+  
+  # Render plot for current album
+  output$albumPlot <- renderPlotly({
+    # Get current album name
+    current_album <- album_order[album_index()]
+    
+    # Generate and display plot for current album
+    plot_album(current_album)
+  })
+}
+
+# Run the application
+shinyApp(ui = ui, server = server)
+```
+
+------------------------------------------------------------------------
+
+Fiona Apple's artistic evolution, analyzed through the lens of valence versus acousticness, reveals a nuanced progression across her discography.
+
+In her debut album "Tidal," tracks like "Sleep to Dream" exhibit high valence and energy, with relatively low acousticness despite their acoustic roots. This juxtaposition suggests a youthful defiance and emotional intensity characteristic of her early work.
+
+Transitioning to "When The Pawn...," we observe a departure from the negative correlation between acousticness and valence seen in her earlier album. "Paper Bag" stands out as a track with both high valence and acousticness, challenging the previous pattern and showcasing a more nuanced approach to instrumentation and emotional expression.
+
+With "Extraordinary Machine," Fiona explores stripped-down arrangements and introspective melodies. The clustering of points on the left side of the plot indicates a preference for quieter moments, as evident in tracks like "Parting Gift," where acoustic instrumentation complements Fiona's haunting vocals, evoking a sense of introspection and longing.
+
+"The Idler Wheel..." marks a further departure from Fiona's earlier sound, characterized by a shift towards slower, more introspective tracks. Despite the decrease in aggression, tracks like "Every Single Night" and "Werewolf" maintain a balance between acoustic elements and emotional depth.
+
+In "Fetch The Bolt Cutters," Fiona defies conventional correlations between acousticness and valence. Here, tracks exhibit a diverse range of sonic textures and emotional tones, from the percussive chaos of "Cosmonauts" to the haunting beauty of "Shameika." This album showcases Fiona's willingness to experiment and challenge musical conventions, resulting in a rich and eclectic sonic landscape.
+
+Overall, Fiona Apple's trajectory as an artist, as observed through the interplay of valence and acousticness in her music, reflects a journey marked by experimentation, evolution, and a steadfast commitment to artistic integrity.
 
 ### Chordogram
 
@@ -196,9 +349,9 @@ ggplot(
   geom_vline(xintercept = c(82, 114, 165), linetype = "dotted", color = "white", linewidth = 1.5)  
 ```
 
--------------------------------------------------------------------------------
+------------------------------------------------------------------------
 
-For the visualisation of different chords I picked the final track of Fiona Apple’s debut album Tidal: Carrion. In this track Fiona alternates between a C minor and C major section. Indicated by the dotted lines you can see a clear switch on the chordogram.
+For the visualisation of different chords I picked the final track of Fiona Apple’s debut album Tidal: Carrion. In this track Fiona alternates between a C minor and C major section. Indicated by the dotted lines you can see a clear switch on the chordogram. In "Carrion" by Fiona Apple, switching from a major to a minor chord signals a change in the story's mood. It's like the moment when the main character realizes the person they're attracted to isn't good for them. The music reflects this shift from hopeful to sad, matching how the character feels as they understand the relationship's problems. So, the minor chord captures the sadness and disappointment the character experiences, showing how the story moves from hope to a more somber realization.
 
 ### Self Similarity and Spectogram
 
@@ -238,7 +391,7 @@ fast_as_you_can |>
     )
   ) +
   geom_tile() +
-  labs(x = "Time (s)", y = NULL, fill = "Magnitude") +
+  labs(x = "Time (s)", y = NULL, fill = "Magnitude", title = "Spectogram") +
   scale_fill_viridis_c() +                              
   theme_classic()
 
@@ -257,7 +410,7 @@ fast_as_you_can |>
   coord_fixed() +
   scale_fill_viridis_c(guide = "none") +
   theme_classic() +
-  labs(x = "", y = "")
+  labs(x = "", y = "", title = "Timbre Self Similarity Matrix")
 
 fast_as_you_can |>
   compmus_self_similarity(pitches, "cosine") |> 
@@ -274,73 +427,189 @@ fast_as_you_can |>
   coord_fixed() +
   scale_fill_viridis_c(guide = "none") +
   theme_classic() +
-  labs(x = "", y = "")
+  labs(x = "", y = "", title = "Pitch Self Similarity Matrix")
+
 ```
 
 ------------------------------------------------------------------------
 
 I have chosen my favorite track of Fiona Apple: Fast as you can for these visualizations. The reason why is because the structure of the track is very interesting. And while you may not see that very clearly in Plot 1: Spectrogram of Pitches and Plot 2: Self Similarity Matrix of Timbre. It is very evident in the third visualization. The song can be divided into 6 sections. The song goes from a verse to a chorus, to a breakdown (visible in yellow) to another verse and chorus which eventually concludes in a long outro.
 
-### An Introduction to Fiona Apple
+### Classification & Clustering
 
 ```{r}
+library(spotifyr)
+library(tidyverse)
+library(tidymodels)
+library(ggplot2)
+library(gganimate)
+library(compmus)
+library(ggdendro)
+library(heatmaply)
+library(kknn)
+library(ranger)
+
+get_conf_mat <- function(fit) {
+  outcome <- .get_tune_outcome_names(fit)
+  fit |> 
+    collect_predictions() |> 
+    conf_mat(truth = outcome, estimate = .pred_class)
+}  
+
+get_pr <- function(fit) {
+  fit |> 
+    conf_mat_resampled() |> 
+    group_by(Prediction) |> mutate(precision = Freq / sum(Freq)) |> 
+    group_by(Truth) |> mutate(recall = Freq / sum(Freq)) |> 
+    ungroup() |> filter(Prediction == Truth) |> 
+    select(class = Prediction, precision, recall)
+}  
+
+top <- get_playlist_audio_features("top 10 fiona apple", "1uY52u1AGRYv2KkZEvHDou")
+bottom <- get_playlist_audio_features("bottom 10 fiona apple", "24QEHRacIo9kz3PNkhYiHR")
+topandbottom <-
+  bind_rows(
+    top |> mutate(playlist = "Top 10 Fiona Apple"),
+    bottom |> mutate(playlist = "Bottom 10 Fiona Apple"),
+  ) |> 
+  add_audio_analysis()
+
+topandbottom_features <-
+  topandbottom |>  # For your portfolio, change this to the name of your corpus.
+  mutate(
+    playlist = factor(playlist),
+    segments = map2(segments, key, compmus_c_transpose),
+    pitches =
+      map(
+        segments,
+        compmus_summarise, pitches,
+        method = "mean", norm = "manhattan"
+      ),
+    timbre =
+      map(
+        segments,
+        compmus_summarise, timbre,
+        method = "mean",
+      )
+  ) |>
+  mutate(pitches = map(pitches, compmus_normalise, "clr")) |>
+  mutate_at(vars(pitches, timbre), map, bind_rows) |>
+  unnest(cols = c(pitches, timbre))
+
+view(topandbottom_features)
+
+topandbottom_recipe <-
+  recipe(
+    playlist ~
+      danceability +
+      energy +
+      loudness +
+      speechiness +
+      acousticness +
+      instrumentalness +
+      liveness +
+      valence +
+      tempo +
+      duration +
+      C + `C#|Db` + D + `D#|Eb` +
+      E + `F` + `F#|Gb` + G +
+      `G#|Ab` + A + `A#|Bb` + B +
+      c01 + c02 + c03 + c04 + c05 + c06 +
+      c07 + c08 + c09 + c10 + c11 + c12,
+    data = topandbottom_features           # Use the same name as the previous block.
+  ) |>
+  step_center(all_predictors()) |>
+  step_scale(all_predictors())      # Converts to z-scores.
+  # step_range(all_predictors())    # Sets range to [0, 1].
+
+topandbottom_cv <- topandbottom_features |> vfold_cv(5)
+
+knn_model <-
+  nearest_neighbor(neighbors = 1) |>
+  set_mode("classification") |> 
+  set_engine("kknn")
+
+topandbottom_knn <- 
+  workflow() |> 
+  add_recipe(topandbottom_recipe) |> 
+  add_model(knn_model) |> 
+  fit_resamples(topandbottom_cv, control = control_resamples(save_pred = TRUE))
+
+topandbottom_knn |> get_pr()
+
+forest_model <-
+  rand_forest() |>
+  set_mode("classification") |> 
+  set_engine("ranger", importance = "impurity")
+
+topandbottom_forest <- 
+  workflow() |> 
+  add_recipe(topandbottom_recipe) |> 
+  add_model(forest_model) |> 
+  fit_resamples(
+    topandbottom_cv, 
+    control = control_resamples(save_pred = TRUE)
+  )
+
+topandbottom_forest |> get_pr()
+
+workflow() |> 
+  add_recipe(topandbottom_recipe) |> 
+  add_model(forest_model) |> 
+  fit(topandbottom_features) |> 
+  pluck("fit", "fit", "fit") |>
+  ranger::importance() |> 
+  enframe() |> 
+  mutate(name = fct_reorder(name, value)) |> 
+  ggplot(aes(name, value)) + 
+  geom_col() + 
+  coord_flip() +
+  theme_minimal() +
+  labs(x = NULL, y = "Importance")
+
+topandbottom_knn |> get_conf_mat() |> autoplot(type = "heatmap")
+
+topandbottom_features |>
+  ggplot(aes(x = acousticness, y = valence, colour = playlist, size = energy)) +
+  geom_point(alpha = 0.8) +
+  scale_color_viridis_d() +
+  labs(
+    x = "Acousticness",
+    y = "Valence",
+    size = "Energy",
+    colour = "Playlist"
+  )
 ```
 
 ------------------------------------------------------------------------
 
-As for my corpus that I will use to build my portfolio, I will be using the discography of Fiona Apple (1977) as my database. Fiona, still a teenager, came onto the alternative jazz and pop scene in the late 90s with aggressive piano ballads, emotional vocal deliveries and amazing songwriting skills. Even though I will not be analyzing the latter as much, it is still nice to mention.
+Efforts to use classification algorithms to tell apart successful and unsuccessful Fiona Apple songs didn't quite pan out. The plots and confusion matrices didn't show any clear differences, suggesting the features used might not be enough to spot what makes a song successful. It seems like we need better or more features to really figure out what sets apart the hits from the misses. So, we might need to tweak our approach or look for more factors to get a clearer picture of what makes Fiona Apple's songs succeed.
 
-I will be analyzing her sound as it progresses over the years. Fiona Apple has released 5 full studio albums between the years of 1996 and 2020: Tidal (1996), When The Pawn.. (1999), Extraordinary Machine (2005), The Idler Wheel.. (2012) and Fetch The Bolt Cutters (2020). A ton has changed in the musical landscape in these 24 years, but Fiona has managed to find her place in it. She has adapted her sound in a lot of ways, never losing what makes a Fiona Apple song a Fiona Apple song.
-
-I will only be using the songs of the albums and not any of the singles. This is quite representative of her full discography as she doesn’t have many singles that aren’t a part of the full album discography. It is the progression of every single full project that i want to measure.
-
-Some tracks, typical & atypical I would like to analyze:
-
-Heavy Balloon - Fetch The Bolt Cutters - This is very different from the regular Fiona Apple formula and sounds more like something Lorde would’ve made in 2016.
-
-Fast As You Can - When The Pawn… - To me personally, the quintessential Fiona Apple song. It is what I would constitute the formula.
-
-------------------------------------------------------------------------
-
-### Radical Sensitivity: Visualized
+### Tempo Analysis
 
 ```{r}
-knitr::opts_chunk$set(echo = TRUE)
 library(shiny)
 library(shinyjs)
 library(spotifyr)
 library(tidyverse)
 library(ggplot2)
-library(gganimate)
-corpus <- get_playlist_audio_features("", "7LDyKnV7gitLREBYl6kVLz")
+library(plotly)
+library(compmus)
 
-corpus <- corpus %>% 
-  mutate(track.album.name = ifelse(track.album.name == "The Idler Wheel Is Wiser Than the Driver of the Screw and Whipping Cords Will Serve You More Than Ropes Will Ever Do (Expanded Edition)",
-                                   "The Idler Wheel...", track.album.name))
+fayc <- get_tidy_audio_analysis("1UmmSKPdCtBuJsmbZG9G3u")
 
-# Specify the order of albums
-album_order <- c("Tidal", "When The Pawn...", "Extraordinary Machine", "The Idler Wheel...", "Fetch The Bolt Cutters")
-
-# Create a new factor column with the desired order
-corpus$track.album.name <- factor(corpus$track.album.name, levels = album_order)
-
-# Create a ggplot with the desired order and text under each plot
-p <- ggplot(corpus, aes(x = acousticness, y = valence, size = energy, color = factor(track.album.name))) + 
-  geom_point() +
-  facet_wrap(~track.album.name, ncol = 2, drop = TRUE) +
-  coord_fixed() +
-  theme(strip.text = element_text(size = 8) + 
-  guides(color = FALSE))
-# Print the plot
-print(p)
-
-view(corpus)
+fayc |>
+  tempogram(window_size = 8, hop_size = 1, cyclic = TRUE) |>
+  ggplot(aes(x = time, y = bpm, fill = power)) +
+  geom_raster() +
+  scale_fill_viridis_c(guide = "none") +
+  labs(x = "Time (s)", y = "Tempo (BPM)", title = "Tempogram: Fast As You Can") +
+  theme_classic()
 ```
 
-### 
+------------------------------------------------------------------------
 
-```{r}
-```
+In analyzing the BPM of "Fast as You Can" by Fiona Apple, a noticeable dip in tempo occurs around 85 seconds, coinciding with a slower breakdown in the song. However, Apple quickly picks up the pace again, maintaining a dynamic rhythm throughout. This observation highlights the song's structural variation, with shifts in tempo adding to its overall musical complexity. Such insights into tempo dynamics offer a glimpse into how artists like Fiona Apple use pacing to craft an engaging song.
 
 ### Conclusions
 
@@ -349,4 +618,4 @@ view(corpus)
 
 ------------------------------------------------------------------------
 
-I have to analyze the corpus further to make any conclusions. My idea for the structure of the portfolio is going to be inspired by an profile by the New Yorker on Fiona Apple called: Fiona Apple’s Art of Radical Sensitivity. I will also be expanding the corpus further by including music of her peers at the time.
+Fiona Apple's musical journey from "Tidal" to "Fetch The Bolt Cutters" showcases her fearless experimentation and artistic growth. She defies genre boundaries, blending emotional depth with innovative instrumentation. While her chord changes and tempo shifts add layers to her storytelling, attempts to classify her songs reveal the complexity of her artistry. Fiona's uniqueness lies in her ability to balance vulnerability with innovation, creating music that resonates with authenticity. Whether it's her aggressive piano ballads or haunting vocal delivery, Fiona captivates audiences with her raw emotion and uncompromising vision. In a musical landscape driven by trends, Fiona Apple stands out as a true original, shaping her own path with every note she sings.
